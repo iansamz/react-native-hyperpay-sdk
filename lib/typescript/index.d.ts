@@ -49,6 +49,21 @@ export type CreateTransactionParams = {
     checkoutID: string,
     shopperResultURL?: string,
 }
+
+export type CheckoutUIParams = {
+    checkoutID: string,
+    token: string,
+    phoneNumber?: string,
+    planId?: number,
+    planType?: string,
+}
+
+export type CheckoutUIResponseType = {
+    checkoutID: string,
+    paymentBrand: string,
+    resourcePath: string,
+}
+
 export type ApplePayCallback = {
     /** Shopper was redirected to the issuer web page.
      Request payment status when shopper returns to the app using transaction.resourcePath or just checkout id. 
@@ -95,6 +110,8 @@ export default class HyperPay {
      */
 
     static createPaymentTransaction(params: CreateTransactionParams): Promise<CreateTransactionResponseType>;
+
+    static openCheckoutUI(params: CheckoutUIParams): Promise<CheckoutUIResponseType>;
 
 
 

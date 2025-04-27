@@ -2,9 +2,12 @@ package com.reactnativehyperpay;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.util.Log;
 import androidx.annotation.NonNull;
 import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
@@ -26,6 +29,9 @@ import com.oppwa.mobile.connect.provider.OppPaymentProvider;
 import com.oppwa.mobile.connect.provider.ThreeDSWorkflowListener;
 import com.oppwa.mobile.connect.provider.Transaction;
 import com.oppwa.mobile.connect.provider.TransactionType;
+import com.facebook.react.bridge.BaseActivityEventListener;
+import com.reactnativehyperpay.activity.CheckoutUIActivity;
+
 
 @ReactModule(name = HyperPayModule.NAME)
 public class HyperPayModule extends ReactContextBaseJavaModule implements ITransactionListener {
@@ -37,10 +43,39 @@ public class HyperPayModule extends ReactContextBaseJavaModule implements ITrans
     private String merchantIdentifier;
     private String countryCode;
     private String mode;
+    
+    private static final String PREFS_NAME = "HyperPayPrefs";
+    private static final String TOKEN_KEY = "token";
+    private static final String PHONE_KEY = "phone_number";
+    private static final String PLAN_ID_KEY = "planID";
+    private static final String PLAN_TYPE_KEY = "planType";
+    
+    private Callback successCallback;
+    private Callback errorCallback;
 
     public HyperPayModule(ReactApplicationContext reactContext) {
         super(reactContext);
         appContext = reactContext.getApplicationContext();
+        
+        // Add activity listener
+        reactContext.addActivityEventListener(new BaseActivityEventListener() {
+            @Override
+            public void onActivityResult(Activity activity, int requestCode, int resultCode, Intent data) {
+                if (requestCode == CheckoutUIActivity.REQUEST_CODE) {
+                    if (resultCode == Activity.RESULT_OK && data != null) {
+                        WritableMap resultData = Arguments.createMap();
+                        resultData.putString("checkoutID", data.getStringExtra(CheckoutUIActivity.PAYMENT_RESULT));
+                        resultData.putString("paymentBrand", data.getStringExtra(CheckoutUIActivity.PAYMENT_METHOD));
+                        resultData.putString("resourcePath", "");
+                        successCallback.invoke(resultData);
+                    } else {
+                        errorCallback.invoke("Payment was cancelled by the user");
+                    }
+                    successCallback = null;
+                    errorCallback = null;
+                }
+            }
+        });
     }
 
     @Override
@@ -108,6 +143,45 @@ public class HyperPayModule extends ReactContextBaseJavaModule implements ITrans
         } catch (PaymentException e) {
             this.emitListeners("onProgress", false);
             promisePaymentTransaction.reject(e);
+        }
+    }
+
+    @ReactMethod
+    public void openCheckoutUI(ReadableMap params, Callback successCallback, Callback errorCallback) {
+        Activity currentActivity = getCurrentActivity();
+        if (currentActivity == null) {
+            errorCallback.invoke("Activity Error: Current activity is null");
+            return;
+        }
+
+        try {
+            String checkoutId = params.getString("checkoutId");
+            String token = params.getString("token");
+            
+            SharedPreferences sharedPreferences = currentActivity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            editor.putString(TOKEN_KEY, token);
+
+            if (params.hasKey("phoneNumber")) {
+                editor.putString(PHONE_KEY, params.getString("phoneNumber"));
+            }
+            if (params.hasKey("planId")) {
+                editor.putInt(PLAN_ID_KEY, params.getInt("planId"));
+            }
+            if (params.hasKey("planType")) {
+                editor.putString(PLAN_TYPE_KEY, params.getString("planType"));
+            }
+            editor.apply();
+
+            Intent intent = new Intent(currentActivity, CheckoutUIActivity.class);
+            intent.putExtra(CheckoutUIActivity.EXTRA_CHECKOUT_ID, checkoutId);
+            intent.putExtra(CheckoutUIActivity.EXTRA_LANGUAGE, "en");
+            currentActivity.startActivityForResult(intent, CheckoutUIActivity.REQUEST_CODE);
+
+            this.successCallback = successCallback;
+            this.errorCallback = errorCallback;
+        } catch (Exception e) {
+            errorCallback.invoke(e.getMessage());
         }
     }
 
