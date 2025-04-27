@@ -61,7 +61,7 @@ dependencies {
   else {
      implementation(name:'ipworks3ds_sdk', ext:'aar')
   }
-  implementation(name:'oppwa.mobile-4.6.0-release', ext:'aar')
+  implementation(name:'oppwa.mobile-6.19.0-release', ext:'aar')
   implementation "androidx.appcompat:appcompat:1.4.2"
   implementation "androidx.lifecycle:lifecycle-extensions:2.2.0"
   implementation "androidx.browser:browser:1.4.0"
